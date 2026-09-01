@@ -125,6 +125,29 @@ def parse_action(text: str) -> tuple | None:
     return None
 
 
+def _complete(client, model, messages, max_tokens=200, attempts=5):
+    """One chat completion, retrying transient failures with backoff.
+
+    Rate limits and 5xx are worth retrying. A moderation rejection is
+    permanent, so it is re-raised immediately for the caller to skip.
+    """
+    import random
+    import time as _t
+
+    for i in range(attempts):
+        try:
+            return client.chat.completions.create(
+                model=model, messages=messages, max_completion_tokens=max_tokens,
+            )
+        except Exception as e:
+            msg = str(e)
+            permanent = "invalid_prompt" in msg or "does not exist" in msg
+            if permanent or i == attempts - 1:
+                raise
+            _t.sleep(min(2 ** i, 16) + random.random())
+    raise RuntimeError("unreachable")
+
+
 @dataclass
 class EpisodeRecord:
     t_say: int
@@ -185,9 +208,7 @@ def run_episode(
         if w.finished:
             rec.end_reason = "world finished"
             break
-        resp = client.chat.completions.create(
-            model=model, messages=messages, max_completion_tokens=200,
-        )
+        resp = _complete(client, model, messages)
         text = resp.choices[0].message.content or ""
         if getattr(resp, "usage", None):
             rec.in_tokens += resp.usage.prompt_tokens or 0
