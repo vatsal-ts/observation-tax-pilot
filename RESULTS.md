@@ -315,12 +315,75 @@ exists for any model other than gpt-5.2.
 
 ---
 
+## R9. Blind par, and a correction to R6's reading
+
+**Date** 2026-09-01 · **Script** `blind_par.py` · 200 seeds per policy
+
+Closes the open item from R2. `oracle.par_staleness` is *informed*: it searches
+against the true world and so walks straight to the mover. `blind_par.py`
+instead takes the best mean over a class of 18 blind policies (6 sweep orders x
+{commit-on-sight, walk-then-look, refresh-in-place}) on the same seeds the
+agent saw. That is a policy-class best, not a proven optimum, so it
+**upper-bounds** the true blind optimum and the excesses below are **lower
+bounds**.
+
+| charged | blind par | slack | agent excess, stated 0 | stated 5 |
+|---|---|---|---|---|
+| 0 | 1.94 | +7 | +1.73 | +1.38 |
+| 2 | 1.94 | +1 | +6.75 | +5.03 |
+| 5 | 8.01 | -8 | +15.73 | +8.35 |
+
+**The agent never approaches par**, running 1.7x the blind optimum even when
+observation is free, and its excess grows with the charged price.
+
+**Correction to how R6 was read.** Par being identical at charged 0 and 2 was
+first taken to mean a charged price of 2 does not make the task harder. That is
+wrong. "Slack" above is the ticks an optimal sweep leaves before the mover
+first relocates at tick 8: seven at charged 0, **one** at charged 2, and
+negative at charged 5. Cost 2 does not raise the minimum observation count but
+converts a forgiving task into a knife-edge one, where any wasted observation
+restarts the search. Par is unaffected only because an optimal player never
+reaches that edge; the agent, already above par, falls off it repeatedly. This
+is the mechanism behind "charging raises effort rather than lowering it".
+
+**Proportional effects.** The stated-price effect is monotonic in relative as
+well as absolute terms: -9.3%, -19.9%, -31.1% at charged 0, 2, 5. This rules
+out the objection that the interaction is a floor artifact of there being more
+to cut when totals are larger.
+
+---
+
+## R10. Does the agent notice the false price?
+
+**Date** 2026-09-01 · **Script** `check_lie_detection.py`
+
+The tick counter appears in every environment reply, so in the quoted-5,
+charged-0 cell an agent could in principle detect that the quoted price is
+false and discount it on rational grounds. That reading would invert the
+paper's claim, turning insensitivity into competence.
+
+Across all **204 transcripts** in that cell, 12% mention cost at all and
+**none** contains any reasoning about the quoted price differing from the
+observed one. The agent is not discounting a price it has caught out.
+
+Cost language does track the **charged** price: it appears in 22% of episodes
+at charged 0 against 57% at charged 5, while moving from 30% to 39% across the
+quoted price. Converging evidence for the behavioural result, from the model's
+own words rather than its action counts.
+
+---
+
 ## Open items
 
-1. **Blind par is still not implemented.** `oracle.par_staleness` is informed.
-   Every staleness figure quoted anywhere assumes par equals the charged cost,
-   which R1 verified only for the informed oracle.
-2. **Unexplained staleness cell.** `say=2 do=5` gave excess 10.16 against 1.04
+1. **Unexplained staleness cell.** `say=2 do=5` gave excess 10.16 against 1.04
    and 4.00 either side of it. No claim rests on the staleness column.
-3. **Salient prompt confound**, above.
-4. **Success is near ceiling**, so observation count carries every analysis.
+2. **Salient prompt confound** (R7). Needs rewording and a rerun of that arm.
+3. **Success is near ceiling**, so observation count carries every analysis.
+4. **Par is a policy-class best**, not a proven optimum. A better blind policy
+   would widen the reported excesses, not narrow them.
+5. **Episodes are independent**, so this measures within-episode use of a
+   quoted price. Whether an agent could learn to discount a repeatedly false
+   price across episodes is untested.
+6. **`place` does not require travel** to the destination, making the task one
+   action shorter than the description implies. Applies identically in every
+   cell.

@@ -28,7 +28,10 @@ downstream means anything. `test_channel_audit.py` proves it four ways:
 |---|---|
 | `world.py` | the simulator, the action API, the referee |
 | `test_channel_audit.py` | the leak test described above |
-| `oracle.py` | par-setter: best achievable staleness and observation count, by search |
+| `oracle.py` | *informed* par: best staleness by search against the true world |
+| `blind_par.py` | *blind* par: best mean over 18 blind policies, the one to use |
+| `check_lie_detection.py` | does the agent notice when the quoted price is false? |
+| `analyze.py` | consolidates every completed grid into cross-run tables |
 | `feasibility.py` | which (cost, relocation period) cells are winnable at all |
 | `run_pilot.py` | measurement demonstration using fixed policies, no API needed |
 | `agent.py` | ReAct loop over an OpenAI model |
@@ -82,6 +85,15 @@ a fixed zone, with the target outside the mover's range.
 
 **Blind par is not informed par.** `oracle.par_staleness` walks straight to the
 mover because it knows the schedule, so it is an *informed* par. The proposal
-specifies a *blind* par-setter, which must search and therefore does worse. A
-blind policy can fail in a cell where the informed oracle says par is
-achievable. This gap is not yet closed in the code.
+specifies a *blind* par-setter, which must search and therefore does worse.
+Closed by `blind_par.py`: par is 1.94, 1.94 and 8.01 observations at charged 0,
+2 and 5, and the agent never gets within 1.7x of it. Being the best of a policy
+class rather than a proven optimum, it upper-bounds the true optimum, so the
+reported excesses are lower bounds.
+
+**Charging 2 does not raise the minimum observation count, but it is not
+therefore harmless.** Par is 1.94 at both charged 0 and 2. What changes is
+slack: an optimal sweep finishes seven ticks before the mover relocates at
+charged 0, and **one** tick before it at charged 2. Cost 2 turns a forgiving
+task into a knife-edge one, which is why the agent's usage doubles while par
+does not move.
