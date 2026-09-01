@@ -64,6 +64,45 @@ ACTION: observe(sink)
 You may write one short line of reasoning before it. Do not write anything \
 after the ACTION line."""
 
+# A second prompt style. Same information, made prominent: the cost leads, it
+# is repeated, and its consequence is spelled out. Crucially this adds no
+# instruction to economise. It states the price more loudly, it never says
+# "look less". If behaviour changes between styles, the agent responds to
+# salience rather than to the price itself.
+SYSTEM_SALIENT = """You are an agent acting in a room. You cannot see the room. The only way to learn anything about it is to use the observe action.
+
+READ THIS FIRST. Every observe action costs you {t_say} ticks of world time. That is {t_say} ticks during which {mover} keeps moving and your knowledge of where it is goes out of date. Observing is by far the most expensive thing you can do. Every other action costs 1 tick.
+
+Places in the room: {places}
+
+Objects in the room: {objects}
+
+Your actions:
+
+  observe(<place>)        what is at that place RIGHT NOW.
+                          COSTS {t_say} TICKS.
+  goto(<place>)           moves you there. Costs 1 tick.
+                          It tells you NOTHING about what is there.
+  pick(<object>)          picks it up, and only works if you are already at
+                          the same place as it. Costs 1 tick.
+  place(<object>,<place>) puts down what you are holding. Costs 1 tick.
+  done()                  ends the episode.
+
+Important: {mover} does not stay still. It moves to a new place every so often, and it keeps moving while you are observing. An observation tells you where things were at the moment you looked, and by the time you can act on it {t_say} ticks have already passed. The other objects never move.
+
+Your task: {task}
+
+Remember: each observe costs {t_say} ticks of world time.
+
+Reply with exactly one action per turn, on its own line, in the form
+
+ACTION: observe(sink)
+
+You may write one short line of reasoning before it. Do not write anything after the ACTION line."""
+
+STYLES = {"plain": None, "salient": SYSTEM_SALIENT}   # None means use SYSTEM
+
+
 ACTION_RE = re.compile(
     r"ACTION:\s*(observe|goto|pick|place|done)\s*\(([^)]*)\)", re.IGNORECASE
 )
@@ -94,6 +133,7 @@ class EpisodeRecord:
     family: str
     seed: int
     model: str
+    prompt_style: str = "plain"
     success: bool = False
     n_obs: int = 0
     n_obs_without_mover: int = 0
@@ -120,10 +160,12 @@ def run_episode(
     schedule: str,
     seed: int,
     max_turns: int = 30,
+    prompt_style: str = "plain",
 ) -> EpisodeRecord:
     cfg = w.cfg
     objects = sorted(list(cfg.statics.keys()) + [cfg.mover])
-    system = SYSTEM.format(
+    template = STYLES.get(prompt_style) or SYSTEM
+    system = template.format(
         places=", ".join(cfg.places),
         objects=", ".join(objects),
         t_say=cfg.t_say,
@@ -132,7 +174,7 @@ def run_episode(
     )
     rec = EpisodeRecord(
         t_say=cfg.t_say, t_do=cfg.t_do, schedule=schedule, family=family,
-        seed=seed, model=model,
+        seed=seed, model=model, prompt_style=prompt_style,
     )
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": "Begin. What is your first action?"}]

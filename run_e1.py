@@ -56,6 +56,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="gpt-5.2")
     ap.add_argument("--episodes", type=int, default=25)
+    ap.add_argument("--max-turns", type=int, default=30)
+    ap.add_argument("--prompt-style", default="plain", choices=["plain", "salient"])
     args = ap.parse_args()
 
     key = load_key()
@@ -81,10 +83,12 @@ def main() -> None:
             w = make_world(t_say, t_do, seed)
             try:
                 r = run_episode(client, args.model, w, MOVER, TARGET,
-                                "dynamic-target", "random", seed)
+                                "dynamic-target", "random", seed,
+                                max_turns=args.max_turns,
+                                prompt_style=args.prompt_style)
             except Exception as e:
-                print(f"  [error {t_say}/{t_do} seed {seed}] {type(e).__name__}: {e}")
-                break
+                print(f"  [skip {t_say}/{t_do} seed {seed}] {type(e).__name__}")
+                continue
             recs.append(r)
         all_recs += recs
         if not recs:
@@ -98,7 +102,7 @@ def main() -> None:
         print(f"  say={t_say} do={t_do}: obs {obs:5.2f}  success {succ:.2f}  "
               f"staleness {stale:6.2f}  malformed {mal}  n={len(recs)}")
 
-    path = out_dir / f"e1-{stamp}.json"
+    path = out_dir / f"e1-{args.prompt_style}-{stamp}.json"
     path.write_text(json.dumps([r.__dict__ for r in all_recs], indent=1), encoding="utf-8")
 
     print("\n" + "=" * 62)
