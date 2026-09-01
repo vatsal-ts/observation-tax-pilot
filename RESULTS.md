@@ -255,13 +255,72 @@ understood.
 
 ---
 
-## R7. Queued (running detached, PID 944)
+## R7. Remaining grids: salience, predictability, and the matched control
 
-`queue.ps1`, sequential, 50 episodes per cell, cap 120:
+**Date** 2026-09-01 · **Script** `run_grid.py` via `queue.ps1` · 50 per cell · cap 120
+**Consolidated by** `analyze.py`, which reads the `*-summary.json` files.
 
-1. gpt-5.2 **salient** prompt, does stating the price loudly change anything
-2. gpt-5.2 **periodic** schedule, predictability control
-3. gpt-5.2 **static-target** family, matched control where cost should not bite
-4. gpt-4.1, gpt-4o-mini, gpt-3.5-turbo, the capability axis
+Change in mean observations from stating a price of 5 rather than 0:
 
-Results pending.
+| condition | charged 0 | charged 5 |
+|---|---|---|
+| moving target, unpredictable (R6) | **-0.34** | -7.38 |
+| moving target, unpredictable, salient prompt | **-0.74** | -8.64 |
+| moving target, periodic relocation | **+0.34** | -14.27 |
+| **fixed target, matched control** | **-0.08** | **-0.04** |
+
+1798 episodes across four grids. 6 turn-cap hits total (0.3%), 1 malformed
+response. Censoring is not a concern at cap 120.
+
+**The headline replicates in every condition.** Every entry in the
+charged-0 column falls within +/-0.75 observations. A stated price does
+essentially nothing on its own whether the warning is loud or quiet, and
+whether the world is predictable or not.
+
+**The matched control is flat, which is the most important row.** Mean
+observations sit at ~2.0 in all nine cells with success 1.00 throughout, and
+neither parameter moves anything. Whatever the price does in the moving-target
+family, it is specific to needing current information rather than a generic
+reaction to being charged. Without this row the result would be far weaker.
+
+**Salience is not the missing ingredient.** Making the warning prominent takes
+the charged-0 effect from -0.34 to -0.74, which is twice a very small number.
+
+**Predictability changes magnitude, not shape.** Periodic relocation leaves the
+charged-0 effect at +0.34 and gives the largest charged-5 effect (-14.27).
+Under free or cheap observation the agent exploits the cycle and uses only
+~1.1-1.6 observations, against 3.4-9 under an unpredictable schedule.
+
+### Confound found in our own salient prompt
+
+The salient arm uses fewer observations overall (15.86 vs 23.74 at say=0,
+do=5). The prompt asserts "observing is by far the most expensive thing you can
+do" regardless of the stated number, which is false when that number is 0 and
+amounts to a frugality instruction. It was introduced on the explicit claim
+that it added no such instruction. **Within-arm comparisons hold; absolute
+levels are not comparable to the plain arm.** Fixing this requires rewording
+and rerunning that arm.
+
+---
+
+## R8. Capability ladder: abandoned
+
+gpt-4.1 was launched over the full grid and hit sustained rate limiting,
+skipping large numbers of episodes rather than completing cells. gpt-4o-mini
+and gpt-3.5-turbo were never started. The partial gpt-4.1 data is not used.
+
+All agent-facing claims therefore rest on gpt-5.2 alone. The T=0 gate in R5
+remains valid for all four models, since those runs completed, but no grid
+exists for any model other than gpt-5.2.
+
+---
+
+## Open items
+
+1. **Blind par is still not implemented.** `oracle.par_staleness` is informed.
+   Every staleness figure quoted anywhere assumes par equals the charged cost,
+   which R1 verified only for the informed oracle.
+2. **Unexplained staleness cell.** `say=2 do=5` gave excess 10.16 against 1.04
+   and 4.00 either side of it. No claim rests on the staleness column.
+3. **Salient prompt confound**, above.
+4. **Success is near ceiling**, so observation count carries every analysis.
