@@ -172,17 +172,96 @@ episodes fail by construction.
 
 ---
 
-## R5. E1 rerun, cap 80 (running)
+## R5. T=0 competence gate across a model ladder
 
-**Script** `run_e1.py --max-turns 80` · plain and salient prompt styles
+**Date** 2026-09-01 · **Script** `run_gate.py` · 12 episodes per family · cap 30
 
-Two arms, both crossed with the full 2x2 so the cost number stays the only
-thing varying within a style:
+| model | dynamic success | obs | turns | malformed | hit cap |
+|---|---|---|---|---|---|
+| gpt-5.2 | 1.00 | 3.00 | 7.8 | 0 | 0 |
+| gpt-4.1 | 1.00 | 4.08 | 9.1 | 0 | 0 |
+| gpt-4o-mini | 0.92 | 4.58 | 9.5 | 0 | 1 |
+| gpt-3.5-turbo | **0.75** | **8.33** | 15.6 | **1** | **2** |
 
-- **plain** — original wording, uncensored rerun of R4
-- **salient** — cost leads the prompt, is repeated, consequence spelled out.
-  Adds **no** instruction to economise. It states the price more loudly and
-  never says "look less", so a behaviour change indicates sensitivity to
-  salience rather than to being told what to do.
+All four clear the 0.70 threshold, so all are eligible for the sweep, but the
+gradient is monotonic in both success and effort: the weakest model needs 2.8x
+the observations of the strongest to do the same job with looking free.
+
+**This is the first evidence the harness is sound rather than lucky.** The
+`other` failure bucket sat at exactly zero for every strong model. It moves
+only on gpt-3.5-turbo (1 malformed action, 2 turn caps). A harness that
+produced parse failures everywhere, or nowhere regardless of model, would be
+suspect. This is the pattern a working one produces.
+
+---
+
+## R6. Full cost grid, gpt-5.2, plain prompt
+
+**Date** 2026-09-01 · **Script** `run_grid.py` · 50 episodes per cell · cap 120
+**Artifact** `runs/grid-gpt-5.2-plain-random-dynamic-target-*.json`
+449 episodes (1 skipped by a spurious moderation flag), 1235s, 10 workers.
+
+Mean observations, stated cost down the side, actual cost across:
+
+| stated \ actual | 0 | 2 | 5 |
+|---|---|---|---|
+| **0** | 3.66 | 8.69 | 23.74 |
+| **2** | 3.44 | 9.12 | 20.70 |
+| **5** | 3.32 | 6.96 | 16.36 |
+
+**Censoring is not a problem here.** 2 turn-cap hits across 449 episodes, and
+zero malformed actions. Unlike R4, these numbers are quotable.
+
+### The main result
+
+Effect of raising the **stated** cost from 0 to 5, at each level of real cost:
+
+| real cost | effect of stating 5 instead of 0 |
+|---|---|
+| 0 | **-0.34** observations |
+| 2 | **-1.73** |
+| 5 | **-7.38** |
+
+Monotonic across three levels. Averaged over actual cost the stated effect is
+-3.15 observations; the actual-cost effect is **+16.79**, five times larger.
+
+**Reading.** A stated cost is close to inert on its own. Telling the agent
+observation costs 5 ticks when it costs nothing changes behaviour by a third of
+one observation, from 3.66 to 3.32, on 50 episodes per cell. The statement's
+bite grows in proportion to what the agent is actually paying. This is an
+interaction, not a main effect, and it replicates the R4 corners at higher
+power with three levels instead of two.
+
+The rise in observations with real cost (+16.79) is **not** economising. The
+agent looks *more* when looking is expensive, because it keeps losing the mover
+and has to re-search. Cost drives effort up, not down.
+
+### Success and staleness
+
+Success stays high (1.00 everywhere except 0.86, 0.94, 0.94 at real cost 5), so
+success rate is near ceiling and cannot carry the analysis. Observation count
+and staleness are the informative measures, as anticipated in R3.
+
+Excess staleness over par by cell: 0.58, 1.06, 1.04, 0.84, 1.38, **10.16**,
+0.98, 0.94, 4.00.
+
+**Open anomaly.** The `say=2 do=5` cell shows excess 10.16 against 1.04 at
+`say=0 do=5` and 4.00 at `say=5 do=5`. That is non-monotonic and unexplained at
+n=50. It should be checked against the transcripts before any claim rests on
+staleness. Do not build the story on the staleness column until this is
+understood.
+
+**Cost.** 7,039k input, 117k output, about $14 at gpt-5.2 rates.
+
+---
+
+## R7. Queued (running detached, PID 944)
+
+`queue.ps1`, sequential, 50 episodes per cell, cap 120:
+
+1. gpt-5.2 **salient** prompt, does stating the price loudly change anything
+2. gpt-5.2 **periodic** schedule, predictability control
+3. gpt-5.2 **static-target** family, matched control where cost should not bite
+4. gpt-4.1, gpt-4o-mini, gpt-3.5-turbo, the capability axis
 
 Results pending.
