@@ -37,22 +37,35 @@ PERIOD = 8
 _print_lock = threading.Lock()
 
 
-def make_world(t_say: int, t_do: int, seed: int, schedule: str) -> World:
+MAX_TICKS = 2000
+
+
+def make_world(t_say: int, t_do: int, seed: int, schedule: str,
+               period: int = PERIOD) -> World:
+    """`period` is the cup's dwell time. Setting it past MAX_TICKS freezes the
+    cup for the whole episode without changing anything else about the task,
+    which is what the `slow-target` control needs."""
     if schedule == "periodic":
-        sched = PeriodicSchedule(order=ROAMING, period=PERIOD)
+        sched = PeriodicSchedule(order=ROAMING, period=period)
     else:
-        sched = RandomSchedule(places=ROAMING, period=PERIOD, seed=seed)
+        sched = RandomSchedule(places=ROAMING, period=period, seed=seed)
     return World(
         WorldConfig(
             places=PLACES, statics=dict(STATICS), mover=MOVER, schedule=sched,
-            t_do=t_do, t_say=t_say, start="table", max_ticks=2000,
+            t_do=t_do, t_say=t_say, start="table", max_ticks=MAX_TICKS,
         )
     )
 
 
 def one_episode(client, args, t_say, t_do, seed, family, schedule):
-    obj = MOVER if family == "dynamic-target" else "bowl"
-    w = make_world(t_say, t_do, seed, schedule)
+    # static-target swaps in the immobile bowl, which changes the target's
+    # identity and difficulty along with its mobility, and leaves the measure
+    # with almost no variance: the bowl sits in one place in every episode and
+    # 442 of 450 took exactly two observations. slow-target keeps the cup and
+    # slows it instead, so search, target and par are unchanged and only the
+    # going-stale is removed. That is the control the comparison needs.
+    obj = "bowl" if family == "static-target" else MOVER
+    w = make_world(t_say, t_do, seed, schedule, period=args.period)
     return run_episode(
         client, args.model, w, obj, TARGET, family, schedule, seed,
         max_turns=args.max_turns, prompt_style=args.prompt_style,
@@ -88,8 +101,18 @@ def main() -> None:
     ap.add_argument("--costs", type=int, nargs="+", default=[0, 2, 5])
     ap.add_argument("--schedule", default="random", choices=["random", "periodic"])
     ap.add_argument("--family", default="dynamic-target",
-                    choices=["dynamic-target", "static-target"])
+                    choices=["dynamic-target", "static-target", "slow-target"])
+    ap.add_argument("--period", type=int, default=None,
+                    help=f"cup dwell in ticks (default {PERIOD}; "
+                         f"slow-target defaults to {MAX_TICKS})")
     args = ap.parse_args()
+
+    if args.period is None:
+        args.period = MAX_TICKS if args.family == "slow-target" else PERIOD
+    if args.family == "slow-target" and args.period < MAX_TICKS:
+        print(f"slow-target needs period >= {MAX_TICKS} so the cup cannot move "
+              f"within an episode; got {args.period}")
+        return
 
     key = load_key()
     if not key:
@@ -102,7 +125,7 @@ def main() -> None:
     cells = [(s, d) for s in args.costs for d in args.costs]
     total = len(cells) * args.episodes
     print(f"\nGrid: model={args.model} prompt={args.prompt_style} "
-          f"schedule={args.schedule} family={args.family}")
+          f"schedule={args.schedule} family={args.family} period={args.period}")
     print(f"{len(cells)} cells x {args.episodes} episodes = {total} episodes, "
           f"{args.workers} workers, turn cap {args.max_turns}\n")
 

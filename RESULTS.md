@@ -566,6 +566,59 @@ with ticks. The turn maximum is 120; the tick maximum is 564.
 
 ---
 
+## R15. The clean control, and it is decisive
+
+R14 argued the static-target arm was the real experiment. Checking its data
+showed it was not an experiment at all: the bowl sits on the counter in all 450
+episodes because the statics are a module constant, the model already assumes
+bowls belong on counters, and **442 of 450 episodes use exactly two
+observations**. Standard deviation 0.25. Nothing could have registered there,
+including a price effect, so the null was empty.
+
+**The fix.** Keep the cup as the target and lengthen its dwell past the end of
+the episode (`--family slow-target`, period 2000 against a 2000-tick cap). Same
+object, same blind search over five places, cup position still varies by seed,
+par still 3.00. Only the going-stale is removed. Verified before spending: over
+200 seeds the cup lands 74/65/61 across the three roaming places and moves in
+0 of 200 within 700 ticks.
+
+**450 episodes, 0 skipped, 377s, 1.5M in / 49k out.**
+
+| L | S=0 | S=2 | S=5 |
+|---|---|---|---|
+| 0 | 3.16 | 3.28 | 3.14 |
+| 2 | 3.50 | 3.36 | 3.38 |
+| 5 | 3.50 | 3.48 | 3.16 |
+
+Success **1.00 in all nine cells**. Observation spans 3.14 to 3.50 against a
+par of 3.00.
+
+**The two headline contrasts, moving vs slowed:**
+
+| contrast | cup moving | cup slowed |
+|---|---|---|
+| applied cost 0 -> 5, at S=0 | 3.66 -> 23.74 | +0.34, CI [-0.34, +1.00] |
+| stated x applied interaction | -8.94, CI [-12.16, -5.82] | -0.32, CI [-1.22, +0.56] |
+
+Both control intervals include zero. The effect does not survive removing the
+staleness, and neither does the stated-figure effect.
+
+**It is not a ceiling artifact, and this is the part that matters.** The measure
+is not degenerate: 6 distinct counts, modal share 26%, sd **1.64**, against the
+bowl's 0.25. And the agent spends 23.74 observations in the moving world at
+L=5, so wasteful looking is plainly available at that price. In the slowed
+world at the identical price it spends 3.50. The waste is on offer and simply
+not taken once nothing invalidates the answer. No headroom objection is
+available against this control, which is exactly why the bowl arm could not do
+the job.
+
+**Reading.** The knob is labelled cost. Remove only the consequence the cost
+happens to carry, holding the price, task, search and baseline fixed, and the
+whole effect goes. In this environment the price acts entirely through the
+dynamics it disturbs.
+
+---
+
 ## Open items
 
 1. **Unexplained staleness cell.** `say=2 do=5` gave excess 10.16 against 1.04
@@ -580,9 +633,11 @@ with ticks. The turn maximum is 120; the tick maximum is 564.
 6. **`place` does not require travel** to the destination, making the task one
    action shorter than the description implies. Applies identically in every
    cell.
-7. **The decoupled factorial has no valid data** (R13). Latency and staleness
-   are still confounded in every number currently in the log, because the only
-   runs that separated them were run on the broken simulator.
+7. ~~**The decoupled factorial has no valid data** (R13).~~ **Resolved a
+   different way** (R15). The slow-target control separates staleness from cost
+   at two points without needing the split-clock machinery at all, so the
+   confound is broken on valid data. What the factorial would still add is the
+   shape of the response between the two points.
 8. **A passing audit is weaker evidence than it looks.** Sections A to E of the
    channel audit passed against a simulator whose `pick` disagreed with its own
    `observe` in 51 of 60 split-configuration seeds. Every future check should
@@ -590,7 +645,8 @@ with ticks. The turn maximum is 120; the tick maximum is 564.
 9. **The GitHub repo is private**, so the link in the paper's footnote is dead
    to a reader. It has to be made public before the document is sent, or the
    footnote has to go.
-10. **Success is at ceiling in the still-world arm** (1.00 in all nine cells),
-   so that arm can only ever show an absence. It cannot show that latency is
-   harmless when the world moves slowly, only that it does nothing when the
-   world is frozen.
+10. **The control is binary.** Success is 1.00 in all nine slow-target cells
+   and observation is flat, so the arm shows a clean absence. It cannot show
+   how the response behaves for a world that changes slowly rather than not at
+   all, which is the common case. Whether the agent tracks the rate or only
+   detects that the rate is nonzero needs a continuous dwell sweep.
