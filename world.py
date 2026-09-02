@@ -88,12 +88,11 @@ class WorldConfig:
     t_say: int                         # ticks the prompt claims observe costs
     start: str                         # where the agent begins
     max_ticks: int = 200
-    # t_do previously did two jobs at once: it consumed world time AND let the
-    # mover drift, which are the economic cost and the information staleness.
-    # Since nothing else in this world depends on time, those were not merely
-    # correlated, they were the same thing. t_drift separates them: it is how
-    # far the mover's schedule advances during an observation. Defaults to
-    # t_do, reproducing every earlier run exactly.
+    # t_do is latency: the world time an observation consumes. t_drift is how
+    # far the mover's schedule advances during that observation. Held equal,
+    # the two are indistinguishable, since nothing else here depends on time.
+    # Setting them apart is what separates the cost of looking from the decay
+    # of what it returns. Defaults to t_do.
     t_drift: int | None = None
     # A budget only bites if exceeding it can lose the episode.
     deadline: int | None = None
@@ -233,11 +232,10 @@ class World:
 
         verb = action[0]
 
-        # Affordability is checked BEFORE the action applies. It used to be
-        # checked inside _advance, i.e. after the effect had already happened,
-        # so an agent with 2 ticks left could issue a 5-tick observe, receive
-        # the answer, and act on it. 124 of 800 episodes in one run finished
-        # over a deadline the prompt described as fatal.
+        # Affordability is checked BEFORE the action applies. Checking after
+        # the effect would let an agent with 2 ticks left buy a 5-tick observe,
+        # receive the answer and act on it, finishing past a deadline the
+        # prompt describes as fatal.
         if self.cfg.deadline is not None:
             cost = self.cfg.t_do if verb == "observe" else 1
             if self.tick + cost > self.cfg.deadline:
@@ -278,10 +276,10 @@ class World:
             # The only thing this may reveal is whether obj is here, which the
             # spec allows. It must reveal nothing more.
             # Resolve against the drift clock, the same one `observe` and the
-            # referee use. This passed `self.tick` until a review caught it.
-            # With t_drift defaulting to t_do the two clocks are identical, so
-            # every test passed; they diverge only when drift is set apart from
-            # cost, which is exactly the comparison the split exists to make.
+            # referee use. All three must agree, or the world can report the
+            # mover somewhere it then refuses to hand it over. The clocks
+            # coincide while t_drift equals t_do and diverge once it does not,
+            # which is exactly the comparison the split exists to make.
             present = (
                 obj != self.holding
                 and self.holding is None

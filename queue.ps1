@@ -5,7 +5,7 @@
 # runs/ so progress survives this window, the terminal, and the Claude session.
 
 $ErrorActionPreference = "Continue"
-Set-Location "C:\Users\vgupt\OneDrive\Desktop\Vatsal\L3\pilot"
+Set-Location $PSScriptRoot
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 "queue started $stamp" | Out-File -FilePath "runs\queue_status.log" -Encoding utf8
 

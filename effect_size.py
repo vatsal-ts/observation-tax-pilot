@@ -6,11 +6,10 @@ Two questions the raw means cannot answer.
 1. Headroom. If par sits close to the agent's count there is little to cut and
    a small effect means nothing. The normaliser is the reduction achieved as a
    share of the reduction available. Par comes from `fair_par.par`, computed
-   under the agent's own information. This file used to hardcode
-   `PAR = {0: 1.94, 2: 1.94, 5: 8.01}`, the superseded par that swept only the
-   cup's roaming zone, and so kept printing a headroom of 1.72 at charged 0
-   long after R12 corrected it to 0.66. The real headroom is small, which
-   weakens rather than supports the claim this script was written to defend.
+   under the agent's own information, and is never hardcoded here: a par that
+   swept only the mover's roaming zone would know something the agent does not
+   and would overstate the headroom. The real headroom at charged 0 is small,
+   which weakens rather than supports the claim this script tests.
 
 2. Is the effect distinguishable from zero at all? Reported as a bootstrap CI
    and a Welch t-test on the per-episode counts, not on the means.
@@ -29,9 +28,8 @@ from runs_io import pick
 def load_plain_moving() -> dict:
     """Per-episode observation counts for the plain / random / dynamic grid.
 
-    This looped over `load_runs()` and took the first match, so it silently
-    accepted whichever of the 9-cell sweep and the 4-cell powered run happened
-    to come first. `pick` demands the cell count and fails loudly otherwise.
+    Goes through `pick`, which demands the cell count, so the 9-cell sweep and
+    the 4-cell replication can never be confused for one another.
     """
     run = pick("plain", "random", "dynamic-target", n_cells=9)
     print(f"using {run['file']}")

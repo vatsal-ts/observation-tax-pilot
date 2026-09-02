@@ -11,7 +11,7 @@
 #     episodes per cell. At n=50 its CI was [-14.50, +0.46] and included zero.
 
 $ErrorActionPreference = "Continue"
-Set-Location "C:\Users\vgupt\OneDrive\Desktop\Vatsal\L3\pilot"
+Set-Location $PSScriptRoot
 "queue2 started $(Get-Date -Format 'HH:mm:ss')" |
     Out-File -FilePath "runs\queue2_status.log" -Encoding utf8
 

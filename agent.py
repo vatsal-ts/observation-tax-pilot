@@ -229,9 +229,9 @@ def run_episode(
 ) -> EpisodeRecord:
     cfg = w.cfg
     objects = sorted(list(cfg.statics.keys()) + [cfg.mover])
-    # Unknown styles used to fall through to SYSTEM silently. A typo such as
-    # "budgt" would have produced a multi-hour run in which no episode ever saw
-    # the intended prompt, while the records still recorded the requested style.
+    # Fail loudly on an unknown style. Falling through to a default would run
+    # a whole sweep against the wrong prompt while the records still claimed
+    # the requested one.
     if prompt_style not in STYLES:
         raise KeyError(f"unknown prompt_style {prompt_style!r}; "
                        f"known: {sorted(STYLES)}")
@@ -254,9 +254,8 @@ def run_episode(
 
     # place -> DRIFT clock at which the mover was last seen there. Staleness
     # means 'how far has the mover moved since I saw it', so both ends of the
-    # subtraction must be on the drift clock. This stored the elapsed-time
-    # clock and subtracted it from drift, which produced 127 negative values
-    # down to -184 in one run, and those fed the excess-staleness diagnostic.
+    # subtraction must be on the drift clock; mixing in the elapsed-time clock
+    # makes the difference meaningless.
     last_seen: dict[str, int] = {}
 
     for _ in range(max_turns):

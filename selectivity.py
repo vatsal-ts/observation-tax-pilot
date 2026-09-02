@@ -16,11 +16,10 @@ definitions here are the ones the code actually implements:
             found last time. Lowest value: the cheapest thing to give up.
   search    a first look at a place that did not find the mover.
 
-An earlier version of this file counted every mover-finding observation as
-`locating` (4.55 per episode, when at most one is possible), checked only
-`place in seen` for `repeat`, and assigned `found_at` without ever reading it.
-It also printed `nan` as the affirmative verdict "roughly uniform", turning a
-cell with no data into a positive scientific claim.
+`locating` is capped at one per episode by construction, so counting every
+mover-finding observation as `locating` would exceed its own definition. A cell
+with no data prints "not comparable" rather than a verdict, since an absent
+type is not evidence of uniformity.
 
 Run: python selectivity.py
 """
@@ -53,8 +52,8 @@ def classify(rec) -> dict[str, int]:
             picked_from = at
 
     # Which observation actually grounded the pick: the LAST sighting of
-    # picked_from before it. Counting every sighting of that place as
-    # `locating` gave 1.54 per episode against a stated maximum of one.
+    # picked_from before it. Every earlier sighting of that place is a
+    # `sighting`, which keeps `locating` at its stated maximum of one.
     obs = [(i, t) for i, t in enumerate(rec.get("transcript", []))
            if (t.get("parsed") or [None])[0] == "observe"]
     grounding = None

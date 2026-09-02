@@ -1,9 +1,9 @@
 """Decouple elapsed time from information staleness.
 
-The pilot's `t_do` did two jobs at once. It consumed world time, and it let the
-target drift while the agent looked. Since nothing else in that world depended
-on time, those were not merely correlated, they were the same quantity. So the
-headline result could not distinguish
+Held equal, `t_do` does two jobs at once. It consumes world time, and it lets
+the target drift while the agent looks. Since nothing else in this world
+depends on time, those are not merely correlated but identical, so no analysis
+of that setting can distinguish
 
     "observing takes time I do not have"                 (latency)
 
@@ -18,8 +18,8 @@ This runs the 2x2x2 that separates them:
     stated    S in {0,5}   the figure named in the prompt
 
 C=5,D=0 is slow but informative; C=0,D=5 is instant but stale. If behaviour
-tracks D and ignores C, the earlier result was about the world moving on, not
-about time spent.
+tracks D and ignores C, the response is to the world moving on rather than to
+time spent.
 
 Usage: python run_factorial.py --model gpt-5.2 --episodes 40 --workers 10
 """
@@ -44,9 +44,9 @@ STATICS = {"bowl": "counter", "book": "shelf"}
 MOVER, TARGET, PERIOD = "cup", "shelf", 8
 DEADLINE = 60           # binds a profligate agent, ample for an efficient one
 
-# End reasons that mean the episode was cut off rather than concluded. Turn-cap
-# censoring at 30 turns once fell 14/25 against 6/24 across two arms, which on
-# its own can manufacture a difference in observation counts.
+# End reasons that mean the episode was cut off rather than concluded.
+# Asymmetric turn-cap censoring across two arms can manufacture a difference in
+# observation counts on its own, so it is counted per cell.
 CENSORED = ("turn cap", "max_ticks exhausted")
 
 
@@ -79,15 +79,12 @@ def contrast(recs, key, lo, hi, metric):
     Two things this gets right that the previous version did not.
 
     First, it averages over EPISODES within each cell and then over CELLS with
-    equal weight. Averaging the per-cell means directly was fine only while
-    every cell held the same number of episodes; cells lose episodes to API
-    errors, and one cell finishing 31 of 40 silently reweighted the design.
-    Cells are now weighted equally by construction and the imbalance is
-    printed, so a lopsided run is visible instead of absorbed.
+    equal weight. Cells lose episodes to API errors, and weighting by episode
+    count lets one short cell reweight the whole design; here cells are equal
+    by construction and any imbalance is printed rather than absorbed.
 
-    Second, it returns an interval. The project has twice been embarrassed by a
-    point estimate whose interval straddled zero, so no contrast is reported
-    without one.
+    Second, it returns an interval, since a point estimate cannot say whether
+    the contrast is distinguishable from zero.
     """
     other = [k for k in ("t_say", "charged", "drift") if k != key]
 
@@ -133,9 +130,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=10)
     ap.add_argument("--max-turns", type=int, default=60)
     # All three factors are configurable, and the analysis reads its levels
-    # back off these lists. `charged` and `drift` used to be hardcoded (0, 5)
-    # in the cell loop while `eff()` separately hardcoded `== 5` and `== 0`, so
-    # restricting a factor produced a table that no longer matched the summary.
+    # back off these lists, so restricting a factor cannot produce a table and
+    # a summary that disagree about which levels were run.
     ap.add_argument("--stated", type=int, nargs="+", default=[0, 5])
     ap.add_argument("--charged", type=int, nargs="+", default=[0, 5])
     ap.add_argument("--drift", type=int, nargs="+", default=[0, 5])

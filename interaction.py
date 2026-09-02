@@ -1,11 +1,9 @@
 """Does stating a price do something different when the price is charged?
 
-The 3x3 sweep answered this by eye, comparing the say-0-vs-say-5 gap at one
-charged level against the gap at another. Two contrasts whose intervals overlap
-say nothing about their difference, and at 50 episodes per cell they overlapped
-badly: the difference was -7.04 with an interval of [-14.50, +0.46], which
-includes zero. So the sweep never established the interaction it was read as
-establishing.
+Comparing the say-0-vs-say-5 gap at one charged level against the gap at
+another does not answer it: two contrasts whose intervals overlap say nothing
+about their difference. At 50 episodes per cell the difference is -7.04 with an
+interval of [-14.50, +0.46], which includes zero.
 
 This tests the interaction itself, on the 2x2 run built for it at 200 episodes
 per cell:
@@ -15,8 +13,8 @@ per cell:
 with a nonparametric bootstrap resampling episodes within each of the four
 cells, which is the design's actual unit of randomisation.
 
-The number this file exists to make reproducible was previously computed by
-hand and appears nowhere in the code. It is now the only place it comes from.
+This is the only place the reported interaction is computed, so the number in
+the write-up and the number in the code cannot drift apart.
 
 Run: python interaction.py
 """

@@ -79,25 +79,28 @@ over par stays flat at exactly 0.00 and exactly 1.00. `rho_s` also drifts
 upward with behaviour held constant, which is why the proposal does not report
 it.
 
-## Two things the code caught that the proposal had wrong
+## Two design decisions worth knowing about
 
-**The success measure was contaminated.** An early run reported 25% success
-with zero successful picks: the mover wandered onto the target place by itself
-and the referee scored it. Fixed by splitting the room into a roaming zone and
-a fixed zone, with the target outside the mover's range.
+**The room is split into a roaming zone and a fixed zone**, with the target
+place outside the mover's range. Without the split the mover can wander onto
+the target by itself and the referee scores a success the agent never earned,
+which makes the success measure meaningless.
 
-**Blind par is not informed par.** `oracle.par_staleness` walks straight to the
-mover because it knows the schedule, so it is an *informed* par. The proposal
-specifies a *blind* par-setter, which must search and therefore does worse.
-Closed by `fair_par.py`, but only on the second attempt. `blind_par.py` swept
-just the roaming zone, which the prompt never tells the agent about, so it knew
-the mover's range when the agent did not. Fair par sweeps all five places and
-averages over all 120 orders, since a blind agent cannot pick the lucky one.
+**Par is blind, and is the mean over sweep orders.** `oracle.par_staleness`
+knows the schedule and walks straight to the mover, so it is an *informed* par
+and no fair benchmark for an agent that cannot see. `fair_par.py` is the one
+the analysis uses: it sweeps all five places, because the prompt never tells
+the agent which three the mover can occupy, and it averages over all 120 orders,
+because a blind player cannot choose the lucky one. Either shortcut, sweeping
+only the roaming zone or taking the best order, grants knowledge the agent
+lacks and overstates the headroom above par.
+
 Par is **3.00, 4.77 and 14.71** at charged 0, 2 and 5, matching theory at
 charged 0 where the mover's place has expected rank (1+2+3+4+5)/5 = 3.
 
-**Charging makes the task harder for everyone.** Par itself rises fivefold from
-charged 0 to 5, because an optimal sweep starts losing the mover mid-search.
-The agent's *excess* above par grows too, 0.66 to 3.92 to 9.03, so it degrades
-faster than the task does. At charged 0 it runs only 1.22x par, so it is not
-far off a blind optimum when observation is free.
+**Charging makes the task harder for everyone**, which is why nothing is read
+off raw counts. Par itself rises fivefold from charged 0 to 5, because an
+optimal sweep starts losing the mover mid-search. The agent's *excess* above
+par grows too, 0.66 to 3.92 to 9.03, so it degrades faster than the task does.
+At charged 0 it runs only 1.22x par, so it is close to a blind optimum when
+observation is free.

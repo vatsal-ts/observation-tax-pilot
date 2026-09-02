@@ -19,10 +19,10 @@ Six independent checks, because one is easy to fool:
   E. Staleness.    An observation reports the scene before its cost is charged.
   F. Consistency.  observe, pick and the referee resolve against the SAME
                    clock, the rendered clock is monotone, and a deadline is
-                   never overshot. A. to E. all passed while `pick` read the
-                   budget clock instead of the drift clock, because the default
-                   configuration makes the two identical; this section sets
-                   them apart, which is where the bug lived.
+                   never overshot. A. to E. exercise only the default
+                   configuration, where the latency and drift clocks coincide;
+                   this section sets them apart, which is the only setting in
+                   which they can disagree.
 
 Run: python pilot/test_channel_audit.py
 """
@@ -216,9 +216,8 @@ check("observation is timestamped before the cost is charged",
 print("\nF. Clocks: observe, pick and the referee must agree")
 
 # build_world leaves t_drift at None, where drift and tick are identical by
-# construction. That is precisely why a `pick` resolving against the budget
-# clock passed every check here while disagreeing with `observe` in 18 of 40
-# seeds once the two clocks were set apart. This section exercises the split.
+# construction, so no check above can detect a verb resolving against the wrong
+# one. This section sets the two clocks apart, where they can disagree.
 def split_world(seed: int, t_do: int, t_drift: int) -> World:
     rng = random.Random(seed)
     statics = {name: rng.choice(PLACES) for name in STATIC_NAMES}

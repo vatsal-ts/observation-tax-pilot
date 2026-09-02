@@ -1,10 +1,10 @@
 """One loader for every analysis script, so run selection cannot drift.
 
-Two hazards this exists to prevent, both of which bit us:
+Two hazards it exists to prevent:
 
-  * The 16-episode smoke test shares its configuration signature with the real
-    449-episode run. Globbing on that signature silently merges them.
-  * A configuration re-run twice would otherwise be double-counted.
+  * A smoke test shares its configuration signature with the real run, so
+    globbing on that signature merges them.
+  * A configuration run twice would otherwise be double-counted.
 
 Rule: keep only complete grids (>= MIN_EPISODES), and where a configuration
 appears more than once keep the newest timestamp.
@@ -40,10 +40,9 @@ def load_runs(verbose: bool = False) -> list[dict]:
         if len(recs) < MIN_EPISODES:
             skipped.append((Path(f).name, len(recs)))
             continue
-        # The cell set is part of the identity. A 2x2 sweep and a 3x3 sweep of
-        # the same model, style, schedule and family previously shared a key, so
-        # a later 2x2 silently superseded a 449-episode 3x3 and every t_do=2 row
-        # vanished from analysis with no warning.
+        # The cell set is part of a run's identity. Without it a 2x2 sweep and
+        # a 3x3 sweep of the same model, style, schedule and family collide,
+        # and the newer one supersedes the other with no warning.
         cells = sorted({(r["t_say"], r["t_do"]) for r in recs})
         key = (m["model"], m["style"], m["sched"], m["family"], len(cells))
         if key not in best or m["stamp"] > best[key]["stamp"]:
@@ -62,9 +61,9 @@ def pick(style: str, sched: str, family: str, n_cells: int | None = None,
          verbose: bool = False) -> dict:
     """Select exactly one run, or fail loudly.
 
-    Consumers used `[...][0]` on a filtered list, which raised a bare IndexError
-    when nothing matched and silently analysed whichever run happened to sort
-    first when several did. Both are now errors that name the problem.
+    Indexing a filtered list instead would raise a bare IndexError on no match
+    and quietly analyse whichever run sorted first on several. Both are errors
+    here, named as such.
     """
     cands = [r for r in load_runs(verbose=verbose)
              if (r["style"], r["sched"], r["family"]) == (style, sched, family)

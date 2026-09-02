@@ -59,11 +59,10 @@ def make_world(t_say: int, t_do: int, seed: int, schedule: str,
 
 def one_episode(client, args, t_say, t_do, seed, family, schedule):
     # static-target swaps in the immobile bowl, which changes the target's
-    # identity and difficulty along with its mobility, and leaves the measure
-    # with almost no variance: the bowl sits in one place in every episode and
-    # 442 of 450 took exactly two observations. slow-target keeps the cup and
-    # slows it instead, so search, target and par are unchanged and only the
-    # going-stale is removed. That is the control the comparison needs.
+    # identity and difficulty along with its mobility and leaves the measure
+    # with almost no variance. slow-target keeps the cup and slows it instead,
+    # so search, target and par are unchanged and only the going-stale is
+    # removed. That is the control the comparison needs.
     obj = "bowl" if family == "static-target" else MOVER
     w = make_world(t_say, t_do, seed, schedule, period=args.period)
     return run_episode(
@@ -97,7 +96,7 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--max-turns", type=int, default=80)
     ap.add_argument("--prompt-style", default="plain",
-                    choices=sorted(STYLES))   # never hand-listed again
+                    choices=sorted(STYLES))   # derived, so it cannot drift
     ap.add_argument("--costs", type=int, nargs="+", default=[0, 2, 5])
     ap.add_argument("--schedule", default="random", choices=["random", "periodic"])
     ap.add_argument("--family", default="dynamic-target",
