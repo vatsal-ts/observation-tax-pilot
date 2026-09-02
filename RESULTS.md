@@ -525,6 +525,47 @@ the paper may cite a decoupled number until then.
 
 ---
 
+## R14. The grid never had a cost, which makes the control the real experiment
+
+Following R13, a check of what the clock actually does in the grid runs.
+
+`run_grid.py` sets `max_ticks=2000` and no `deadline`. Reconstructing elapsed
+ticks from every transcript in all five analysed runs, 2596 episodes, the
+longest used **564**. Nothing came within a factor of three of the limit, and
+nothing else in the world reads the clock.
+
+So in the entire 3x3 sweep, elapsed time has exactly one consequence: the cup
+relocates. The parameter called `t_do` was never a price the agent paid out of
+anything. It was a latency, and a latency matters only because the world uses
+the time.
+
+This is why the static-target control is the experiment rather than a
+robustness check. It applies the identical latency to a world that cannot use
+it:
+
+| applied latency | world moving | world still |
+|---|---|---|
+| 0 | 3.23 obs, 1.00 success | 2.06 obs, 1.00 |
+| 5 | 23.01 obs, 0.87 success | 2.04 obs, 1.00 |
+
+Across all nine conditions of the still-world sweep, observation ranges from
+1.98 to 2.06 and success is 1.00 in every cell. The agent waits the five ticks
+and does not change what it does.
+
+A knob that moves behaviour by a factor of seven with the world in motion and
+by 0.02 observations with the world held still is not operating on price. The
+factorial invalidated in R13 was built to establish this by varying drift
+continuously; the control establishes the same thing at two points, on data
+that is valid.
+
+**Consequence for the write-up.** The paper is reframed around latency with no
+budget account anywhere, and the invalid factorial is described in Limits as
+run and discarded rather than cited. One error was caught during that rewrite:
+a draft sentence read "the longest episode used roughly 120", conflating turns
+with ticks. The turn maximum is 120; the tick maximum is 564.
+
+---
+
 ## Open items
 
 1. **Unexplained staleness cell.** `say=2 do=5` gave excess 10.16 against 1.04
@@ -546,3 +587,10 @@ the paper may cite a decoupled number until then.
    channel audit passed against a simulator whose `pick` disagreed with its own
    `observe` in 51 of 60 split-configuration seeds. Every future check should
    be asked which configuration it fails to exercise.
+9. **The GitHub repo is private**, so the link in the paper's footnote is dead
+   to a reader. It has to be made public before the document is sent, or the
+   footnote has to go.
+10. **Success is at ceiling in the still-world arm** (1.00 in all nine cells),
+   so that arm can only ever show an absence. It cannot show that latency is
+   harmless when the world moves slowly, only that it does nothing when the
+   world is frozen.
