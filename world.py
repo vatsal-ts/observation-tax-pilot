@@ -84,10 +84,19 @@ class WorldConfig:
     statics: dict[str, str]            # object name -> fixed place
     mover: str                         # name of the single moving object
     schedule: Schedule
-    t_do: int                          # ticks the world charges for observe
+    t_do: int                          # ticks of BUDGET an observe consumes
     t_say: int                         # ticks the prompt claims observe costs
     start: str                         # where the agent begins
     max_ticks: int = 200
+    # t_do previously did two jobs at once: it consumed world time AND let the
+    # mover drift, which are the economic cost and the information staleness.
+    # Since nothing else in this world depends on time, those were not merely
+    # correlated, they were the same thing. t_drift separates them: it is how
+    # far the mover's schedule advances during an observation. Defaults to
+    # t_do, reproducing every earlier run exactly.
+    t_drift: int | None = None
+    # A budget only bites if exceeding it can lose the episode.
+    deadline: int | None = None
 
     def __post_init__(self) -> None:
         for obj, place in self.statics.items():
@@ -172,7 +181,8 @@ class World:
 
     def __init__(self, cfg: WorldConfig) -> None:
         self.cfg = cfg
-        self.tick = 0
+        self.tick = 0          # budget consumed
+        self.drift = 0         # how far the mover's schedule has run
         self.agent_at = cfg.start
         self.holding: Optional[str] = None
         self.finished = False
@@ -186,7 +196,7 @@ class World:
 
     def truth_location(self, obj: str, tick: Optional[int] = None) -> Optional[str]:
         """Where `obj` really is. For the referee and the analysis only."""
-        tick = self.tick if tick is None else tick
+        tick = self.drift if tick is None else tick
         if obj == self.cfg.mover:
             if self.holding == obj:
                 return None                     # in hand
@@ -219,11 +229,11 @@ class World:
         if verb == "observe":
             place = action[1]
             if place not in self.cfg.places:
-                self._advance(self.cfg.t_do)
+                self._advance(self.cfg.t_do, self._drift())
                 return ErrorResult(self.tick)
-            seen_at = self.tick
+            seen_at = self.drift
             objects = self._objects_at(place, seen_at)
-            self._advance(self.cfg.t_do)          # observe now, pay after
+            self._advance(self.cfg.t_do, self._drift())   # observe now, pay after
             self._record("observe", place, seen_at, objects)
             return ObserveResult(place, objects, seen_at)
 
@@ -279,10 +289,17 @@ class World:
 
     # -- internals ---------------------------------------------------------
 
-    def _advance(self, ticks: int) -> None:
+    def _advance(self, ticks: int, drift: int | None = None) -> None:
         self.tick += ticks
+        self.drift += ticks if drift is None else drift
         if self.tick >= self.cfg.max_ticks:
             self.finished = True
+        if self.cfg.deadline is not None and self.tick >= self.cfg.deadline:
+            self.finished = True
+
+    def _drift(self) -> int:
+        c = self.cfg
+        return c.t_do if c.t_drift is None else c.t_drift
 
     def _record(self, verb, arg, tick, objects, ok=None) -> None:
         self.log.append(
@@ -305,6 +322,8 @@ def make_world(cfg: WorldConfig) -> World:
             mover=cfg.mover,
             schedule=cfg.schedule,
             t_do=cfg.t_do,
+            t_drift=cfg.t_drift,
+            deadline=cfg.deadline,
             t_say=cfg.t_say,
             start=cfg.start,
             max_ticks=cfg.max_ticks,

@@ -100,7 +100,41 @@ ACTION: observe(sink)
 
 You may write one short line of reasoning before it. Do not write anything after the ACTION line."""
 
-STYLES = {"plain": None, "salient": SYSTEM_SALIENT}   # None means use SYSTEM
+# Prompt for the decoupled design. An observation now has two separable
+# consequences: it consumes a stated BUDGET (an economic cost, which can run
+# out), and it lets the target drift (an informational cost). The original
+# prompt could not express this because a single number did both jobs.
+SYSTEM_BUDGET = """You are an agent acting in a room. You cannot see the room. The only way to learn anything about it is to use the observe action.
+
+Places in the room: {places}
+
+Objects in the room: {objects}
+
+You have a budget of {deadline} ticks for the whole episode. If you run out of budget before finishing, you fail.
+
+Your actions and what they cost you from that budget:
+
+  observe(<place>)        tells you which objects are at that place RIGHT NOW.
+                          Costs {t_say} tick(s) of budget.
+  goto(<place>)           moves you there. Costs 1 tick.
+                          It tells you NOTHING about what is there.
+  pick(<object>)          picks it up, and only works if you are already at
+                          the same place as it. Costs 1 tick.
+  place(<object>,<place>) puts down what you are holding. Costs 1 tick.
+  done()                  ends the episode.
+
+Important: {mover} does not stay still. It moves to a new place every so often. An observation tells you where things were at the moment you looked. The other objects never move.
+
+Your task: {task}
+
+Reply with exactly one action per turn, on its own line, in the form
+
+ACTION: observe(sink)
+
+You may write one short line of reasoning before it. Do not write anything after the ACTION line."""
+
+
+STYLES = {"plain": None, "salient": SYSTEM_SALIENT, "budget": SYSTEM_BUDGET}   # None means use SYSTEM
 
 
 ACTION_RE = re.compile(
@@ -188,11 +222,14 @@ def run_episode(
     cfg = w.cfg
     objects = sorted(list(cfg.statics.keys()) + [cfg.mover])
     template = STYLES.get(prompt_style) or SYSTEM
+    if "{deadline}" not in template:
+        template = template.replace("{task}", "{task}")  # no-op, keeps kwargs uniform
     system = template.format(
         places=", ".join(cfg.places),
         objects=", ".join(objects),
         t_say=cfg.t_say,
         mover=cfg.mover,
+        deadline=cfg.deadline if cfg.deadline is not None else "unlimited",
         task=f"put {task_obj} on the {task_place}.",
     )
     rec = EpisodeRecord(
