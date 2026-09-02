@@ -3,13 +3,17 @@ is nothing left to cut?
 
 Two questions the raw means cannot answer.
 
-1. With blind par at 1.94 and the agent at 3.66, there ARE 1.72 observations of
-   headroom at charged 0. So "no room to economise" is not automatically true.
-   The right normaliser is the reduction achieved as a share of the reduction
-   available, which controls for the floor exactly.
+1. Headroom. If par sits close to the agent's count there is little to cut and
+   a small effect means nothing. The normaliser is the reduction achieved as a
+   share of the reduction available. Par comes from `fair_par.par`, computed
+   under the agent's own information. This file used to hardcode
+   `PAR = {0: 1.94, 2: 1.94, 5: 8.01}`, the superseded par that swept only the
+   cup's roaming zone, and so kept printing a headroom of 1.72 at charged 0
+   long after R12 corrected it to 0.66. The real headroom is small, which
+   weakens rather than supports the claim this script was written to defend.
 
-2. Is -0.34 distinguishable from zero at all? Reported as a bootstrap CI and a
-   Welch t-test on the per-episode counts, not on the means.
+2. Is the effect distinguishable from zero at all? Reported as a bootstrap CI
+   and a Welch t-test on the per-episode counts, not on the means.
 """
 
 from __future__ import annotations
@@ -18,21 +22,23 @@ import random
 import statistics
 from collections import defaultdict
 
-from runs_io import load_runs
-
-PAR = {0: 1.94, 2: 1.94, 5: 8.01}
+from fair_par import par
+from runs_io import pick
 
 
 def load_plain_moving() -> dict:
-    """Per-episode observation counts for the plain / random / dynamic grid."""
-    for run in load_runs():
-        if (run['style'], run['sched'], run['family']) == ('plain', 'random', 'dynamic-target'):
-            print(f"using {run['file']}")
-            cells = defaultdict(list)
-            for r in run['records']:
-                cells[(r['t_say'], r['t_do'])].append(r['n_obs'])
-            return cells
-    return {}
+    """Per-episode observation counts for the plain / random / dynamic grid.
+
+    This looped over `load_runs()` and took the first match, so it silently
+    accepted whichever of the 9-cell sweep and the 4-cell powered run happened
+    to come first. `pick` demands the cell count and fails loudly otherwise.
+    """
+    run = pick("plain", "random", "dynamic-target", n_cells=9)
+    print(f"using {run['file']}")
+    cells = defaultdict(list)
+    for r in run["records"]:
+        cells[(r["t_say"], r["t_do"])].append(r["n_obs"])
+    return cells
 
 
 def boot_ci(a, b, n=20000, seed=0):
@@ -61,6 +67,7 @@ def main() -> None:
         return
 
     print("\nEffect of stating 5 rather than 0, per charged price")
+    print("(par from fair_par, computed under the agent's own information)")
     print("=" * 74)
     print(f"{'charged':>8}{'par':>7}{'say0':>8}{'say5':>8}{'cut':>8}"
           f"{'headroom':>10}{'cut/headroom':>14}{'95% CI':>18}")
@@ -70,10 +77,15 @@ def main() -> None:
             continue
         ma, mb = statistics.mean(a), statistics.mean(b)
         cut = ma - mb
-        head = ma - PAR[do]
+        p = par(do)
         lo, hi = boot_ci(a, b)
-        print(f"{do:>8}{PAR[do]:>7.2f}{ma:>8.2f}{mb:>8.2f}{cut:>8.2f}"
-              f"{head:>10.2f}{100*cut/head:>13.0f}%"
+        if p is None:
+            print(f"{do:>8}{'n/a':>7}{ma:>8.2f}{mb:>8.2f}{cut:>8.2f}")
+            continue
+        head = ma - p[0]
+        share = f"{100*cut/head:>13.0f}%" if head > 0.05 else f"{'n/a':>14}"
+        print(f"{do:>8}{p[0]:>7.2f}{ma:>8.2f}{mb:>8.2f}{cut:>8.2f}"
+              f"{head:>10.2f}{share}"
               f"{f'[{lo:+.2f},{hi:+.2f}]':>18}")
 
     print("\nIs the charged-0 effect distinguishable from zero?")
