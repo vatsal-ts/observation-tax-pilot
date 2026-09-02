@@ -24,7 +24,7 @@ import statistics
 import time
 from pathlib import Path
 
-from agent import EpisodeRecord, load_key, run_episode
+from agent import EpisodeRecord, STYLES, load_key, run_episode
 from world import RandomSchedule, World, WorldConfig
 
 ROAMING = ("table", "sink", "basin")
@@ -57,7 +57,8 @@ def main() -> None:
     ap.add_argument("--model", default="gpt-5.2")
     ap.add_argument("--episodes", type=int, default=25)
     ap.add_argument("--max-turns", type=int, default=30)
-    ap.add_argument("--prompt-style", default="plain", choices=["plain", "salient"])
+    ap.add_argument("--prompt-style", default="plain",
+                    choices=sorted(STYLES))   # never hand-listed again
     args = ap.parse_args()
 
     key = load_key()

@@ -40,12 +40,42 @@ def load_runs(verbose: bool = False) -> list[dict]:
         if len(recs) < MIN_EPISODES:
             skipped.append((Path(f).name, len(recs)))
             continue
-        key = (m["model"], m["style"], m["sched"], m["family"])
+        # The cell set is part of the identity. A 2x2 sweep and a 3x3 sweep of
+        # the same model, style, schedule and family previously shared a key, so
+        # a later 2x2 silently superseded a 449-episode 3x3 and every t_do=2 row
+        # vanished from analysis with no warning.
+        cells = sorted({(r["t_say"], r["t_do"]) for r in recs})
+        key = (m["model"], m["style"], m["sched"], m["family"], len(cells))
         if key not in best or m["stamp"] > best[key]["stamp"]:
-            best[key] = {**m.groupdict(), "records": recs, "file": f}
+            best[key] = {**m.groupdict(), "records": recs, "file": f,
+                         "cells": cells, "n_cells": len(cells)}
     if verbose:
         for name, n in skipped:
             print(f"  skipped {name} ({n} episodes, below {MIN_EPISODES})")
         for r in best.values():
-            print(f"  using   {Path(r['file']).name} ({len(r['records'])} episodes)")
+            print(f"  using   {Path(r['file']).name} "
+                  f"({len(r['records'])} episodes, {r['n_cells']} cells)")
     return list(best.values())
+
+
+def pick(style: str, sched: str, family: str, n_cells: int | None = None,
+         verbose: bool = False) -> dict:
+    """Select exactly one run, or fail loudly.
+
+    Consumers used `[...][0]` on a filtered list, which raised a bare IndexError
+    when nothing matched and silently analysed whichever run happened to sort
+    first when several did. Both are now errors that name the problem.
+    """
+    cands = [r for r in load_runs(verbose=verbose)
+             if (r["style"], r["sched"], r["family"]) == (style, sched, family)
+             and (n_cells is None or r["n_cells"] == n_cells)]
+    if not cands:
+        raise LookupError(
+            f"no run for {style}/{sched}/{family}"
+            + (f" with {n_cells} cells" if n_cells else ""))
+    if len(cands) > 1:
+        opts = ", ".join(f"{len(c['records'])}eps/{c['n_cells']}cells" for c in cands)
+        raise LookupError(
+            f"{len(cands)} runs match {style}/{sched}/{family} ({opts}); "
+            "pass n_cells to disambiguate")
+    return cands[0]

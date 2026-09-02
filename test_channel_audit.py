@@ -4,7 +4,7 @@ This is the precondition for the whole project. If any other action leaks
 where things are, the agent gets free observations, the observation cost
 stops binding, and no downstream number means anything.
 
-Four independent checks, because one is easy to fool:
+Six independent checks, because one is easy to fool:
 
   A. Structural.   Only ObserveResult carries an `objects` field.
   B. Invariance.   For goto / place / done / malformed actions, the exact
@@ -16,6 +16,13 @@ Four independent checks, because one is easy to fool:
   D. Clock.        Tick counts after a fixed action sequence are identical
                    across those same worlds, so the clock is not a side
                    channel either.
+  E. Staleness.    An observation reports the scene before its cost is charged.
+  F. Consistency.  observe, pick and the referee resolve against the SAME
+                   clock, the rendered clock is monotone, and a deadline is
+                   never overshot. A. to E. all passed while `pick` read the
+                   budget clock instead of the drift clock, because the default
+                   configuration makes the two identical; this section sets
+                   them apart, which is where the bug lived.
 
 Run: python pilot/test_channel_audit.py
 """
@@ -202,6 +209,54 @@ check("observation is timestamped before the cost is charged",
       isinstance(r, ObserveResult) and r.tick == 0 and w.tick == 5,
       f"obs.tick={r.tick} clock={w.tick}")
 
+
+
+# --------------------------------------------------- F. clock consistency
+
+print("\nF. Clocks: observe, pick and the referee must agree")
+
+# build_world leaves t_drift at None, where drift and tick are identical by
+# construction. That is precisely why a `pick` resolving against the budget
+# clock passed every check here while disagreeing with `observe` in 18 of 40
+# seeds once the two clocks were set apart. This section exercises the split.
+def split_world(seed: int, t_do: int, t_drift: int) -> World:
+    rng = random.Random(seed)
+    statics = {name: rng.choice(PLACES) for name in STATIC_NAMES}
+    cfg = WorldConfig(
+        places=PLACES, statics=statics, mover=MOVER,
+        schedule=RandomSchedule(places=PLACES, period=3, seed=seed),
+        t_do=t_do, t_say=t_do, t_drift=t_drift, start="table", max_ticks=9999,
+    )
+    return World(cfg)
+
+mismatch = 0
+for seed in range(60):
+    w = split_world(seed, t_do=5, t_drift=0)
+    for place in PLACES:
+        res = w.step(("observe", place))
+        if MOVER in res.objects:
+            w.step(("goto", place))
+            if not w.step(("pick", MOVER)).ok:
+                mismatch += 1
+            break
+check("observe and pick agree when drift is split from cost", mismatch == 0,
+      f"{mismatch}/60 seeds where observe found the mover but pick failed")
+
+# the agent must see one monotone clock, whatever the split
+w = split_world(0, t_do=5, t_drift=0)
+shown = [w.step(("observe", "table")).tick for _ in range(3)]
+shown.append(w.step(("goto", "sink")).tick)
+check("the rendered clock is monotone under a split", shown == sorted(shown),
+      str(shown))
+
+# a deadline must not be overshot by an action the agent cannot afford
+w2 = World(WorldConfig(places=PLACES, statics={"bowl": "counter"}, mover=MOVER,
+                       schedule=RandomSchedule(places=PLACES, period=3, seed=1),
+                       t_do=5, t_say=5, start="table", max_ticks=9999,
+                       deadline=12))
+for _ in range(6):
+    w2.step(("observe", "table"))
+check("a deadline is never overshot", w2.tick <= 12, f"tick={w2.tick} deadline=12")
 
 # -------------------------------------------------------------------- verdict
 

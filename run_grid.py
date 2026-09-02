@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from agent import EpisodeRecord, load_key, run_episode
+from agent import EpisodeRecord, STYLES, load_key, run_episode
 from world import PeriodicSchedule, RandomSchedule, World, WorldConfig
 
 ROAMING = ("table", "sink", "basin")
@@ -83,7 +83,8 @@ def main() -> None:
     ap.add_argument("--episodes", type=int, default=25)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--max-turns", type=int, default=80)
-    ap.add_argument("--prompt-style", default="plain", choices=["plain", "salient"])
+    ap.add_argument("--prompt-style", default="plain",
+                    choices=sorted(STYLES))   # never hand-listed again
     ap.add_argument("--costs", type=int, nargs="+", default=[0, 2, 5])
     ap.add_argument("--schedule", default="random", choices=["random", "periodic"])
     ap.add_argument("--family", default="dynamic-target",

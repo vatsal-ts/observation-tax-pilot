@@ -461,6 +461,70 @@ the paper.
 
 ---
 
+## R13. CORRECTION: the decoupled factorial was run on a broken simulator
+
+An external review of the code found six defects, and the first invalidates
+every factorial run. The reframe to a decoupled design was correct; the runs
+that tested it were not.
+
+**The defect that matters.** `pick` resolved the object's position against the
+elapsed-time clock while `observe` and the referee resolved it against the
+drift clock. With `t_drift` unset the two clocks are the same number, which is
+why the pilot grid and every earlier check passed. The factorial exists
+precisely to set them apart, so the factorial is the one place the bug fires.
+Measured directly: of 60 seeds in the split configuration, `observe` reported
+the mover at a place from which `pick` then refused to lift it in **51**. The
+agent was being told the truth and then punished for acting on it.
+
+Consequence: `runs/factorial-*` are moved to `runs/invalidated/` with a note.
+The 3x3 grids, E1, and the gate are unaffected, since none of those runners set
+`t_drift` or `deadline`, so the two clocks coincided and `pick` happened to
+read a correct value.
+
+**The other five.**
+
+| # | Defect | Effect on results |
+|---|---|---|
+| 2 | `ObserveResult` rendered the drift clock while every other result rendered elapsed time | the agent saw a clock that jumped backwards, so it could not track its own remaining time |
+| 3 | affordability was checked after the action applied | 124 of 800 episodes finished past a deadline the prompt called fatal |
+| 4 | staleness subtracted an elapsed-time value from a drift value | 127 negative staleness values, to -184 |
+| 5 | `runs_io` keyed runs without the cell count | a later 2x2 superseded the 449-episode 3x3 and every `t_do=2` row silently vanished |
+| 6 | `selectivity.py` counted every mover sighting as `locating` | 1.54 per episode against a documented maximum of 1 |
+
+All six are fixed and each fix is verified separately. The verification that
+matters most is the audit: section F of `test_channel_audit.py` now exercises
+the split configuration, and reintroducing defect 1 makes it fail 51/60 where
+sections A through E all still pass.
+
+**Corrected selectivity** (449-episode random grid, `locating` now bounded by 1
+as documented). Proportion of each observation type removed by stating a price
+of 5:
+
+| charged | search | repeat | sighting | locating |
+|---|---|---|---|---|
+| 0 | -3% | n/a | 90% | 2% |
+| 2 | -3% | 16% | 67% | 2% |
+| 5 | 12% | 35% | 43% | -2% |
+
+The reading survives the fix and is the strongest behavioural result in the
+log: at the enforced price the agent sheds 35% of its lowest-value repeats and
+12% of first looks, while the observation that grounds the pick is preserved to
+within 2%. That is a reallocation, not a uniform suppression.
+
+**Design integrity added to the runner.** `run_factorial.py` now weights cells
+equally and pairs them before contrasting, so a cell that loses episodes to API
+errors shifts the interval rather than the point estimate. On synthetic data
+with one cell at 2 of 40 episodes and a true effect of -4.00, the paired
+estimator returns -4.000 and the episode-weighted mean returns -5.402. It also
+counts censored episodes per cell and reports imbalance before quoting any
+effect, because asymmetric turn-cap censoring produced a spurious difference
+once already (R4).
+
+**What has to be re-run.** The whole 2x2x2, on the fixed simulator. Nothing in
+the paper may cite a decoupled number until then.
+
+---
+
 ## Open items
 
 1. **Unexplained staleness cell.** `say=2 do=5` gave excess 10.16 against 1.04
@@ -475,3 +539,10 @@ the paper.
 6. **`place` does not require travel** to the destination, making the task one
    action shorter than the description implies. Applies identically in every
    cell.
+7. **The decoupled factorial has no valid data** (R13). Latency and staleness
+   are still confounded in every number currently in the log, because the only
+   runs that separated them were run on the broken simulator.
+8. **A passing audit is weaker evidence than it looks.** Sections A to E of the
+   channel audit passed against a simulator whose `pick` disagreed with its own
+   `observe` in 51 of 60 split-configuration seeds. Every future check should
+   be asked which configuration it fails to exercise.

@@ -115,7 +115,8 @@ class WorldConfig:
 class ObserveResult:
     place: str
     objects: tuple[str, ...]
-    tick: int
+    tick: int                # elapsed time, the clock the agent is shown
+    resolved_at: int = -1    # drift clock the objects were resolved against
 
     def render(self) -> str:
         if self.objects:
@@ -186,6 +187,12 @@ class World:
         self.agent_at = cfg.start
         self.holding: Optional[str] = None
         self.finished = False
+        # Why the episode stopped. "world finished" told the analysis nothing:
+        # running out of deadline, exhausting max_ticks and the agent choosing
+        # to stop are three different outcomes, and only the first two are
+        # censoring. Distinguishing them is what makes a censoring count
+        # possible at all.
+        self.finish_reason: str = ""
         # Once the mover is picked up it stops following its schedule. Without
         # this the dynamic task would be unwinnable by construction.
         self._mover_captured = False
@@ -226,16 +233,35 @@ class World:
 
         verb = action[0]
 
+        # Affordability is checked BEFORE the action applies. It used to be
+        # checked inside _advance, i.e. after the effect had already happened,
+        # so an agent with 2 ticks left could issue a 5-tick observe, receive
+        # the answer, and act on it. 124 of 800 episodes in one run finished
+        # over a deadline the prompt described as fatal.
+        if self.cfg.deadline is not None:
+            cost = self.cfg.t_do if verb == "observe" else 1
+            if self.tick + cost > self.cfg.deadline:
+                self.finished = True
+                self.finish_reason = "deadline: next action unaffordable"
+                return DoneResult(self.tick)
+
         if verb == "observe":
             place = action[1]
             if place not in self.cfg.places:
                 self._advance(self.cfg.t_do, self._drift())
                 return ErrorResult(self.tick)
-            seen_at = self.drift
-            objects = self._objects_at(place, seen_at)
+            # Two different clocks, for two different jobs. Objects resolve
+            # against drift, because that is what governs where the mover is.
+            # The tick SHOWN to the agent is elapsed time, so that every reply
+            # it ever sees reports the same counter. Rendering drift here while
+            # every other result rendered elapsed time gave the agent a clock
+            # that jumped back and forth between actions.
+            resolve_at = self.drift
+            objects = self._objects_at(place, resolve_at)
+            shown = self.tick
             self._advance(self.cfg.t_do, self._drift())   # observe now, pay after
-            self._record("observe", place, seen_at, objects)
-            return ObserveResult(place, objects, seen_at)
+            self._record("observe", place, resolve_at, objects)
+            return ObserveResult(place, objects, shown, resolve_at)
 
         if verb == "goto":
             place = action[1]
@@ -251,10 +277,15 @@ class World:
             obj = action[1]
             # The only thing this may reveal is whether obj is here, which the
             # spec allows. It must reveal nothing more.
+            # Resolve against the drift clock, the same one `observe` and the
+            # referee use. This passed `self.tick` until a review caught it.
+            # With t_drift defaulting to t_do the two clocks are identical, so
+            # every test passed; they diverge only when drift is set apart from
+            # cost, which is exactly the comparison the split exists to make.
             present = (
                 obj != self.holding
                 and self.holding is None
-                and self.truth_location(obj, self.tick) == self.agent_at
+                and self.truth_location(obj, self.drift) == self.agent_at
             )
             if present:
                 if obj == self.cfg.mover:
@@ -281,6 +312,7 @@ class World:
 
         if verb == "done":
             self.finished = True
+            self.finish_reason = "agent called done"
             self._advance(1)
             return DoneResult(self.tick)
 
@@ -292,14 +324,21 @@ class World:
     def _advance(self, ticks: int, drift: int | None = None) -> None:
         self.tick += ticks
         self.drift += ticks if drift is None else drift
-        if self.tick >= self.cfg.max_ticks:
+        if self.tick >= self.cfg.max_ticks and not self.finished:
             self.finished = True
-        if self.cfg.deadline is not None and self.tick >= self.cfg.deadline:
+            self.finish_reason = "max_ticks exhausted"
+        if (self.cfg.deadline is not None and self.tick >= self.cfg.deadline
+                and not self.finished):
             self.finished = True
+            self.finish_reason = "deadline reached"
 
-    def _drift(self) -> int:
+    def drift_step(self) -> int:
+        """Ticks the mover's schedule advances during one observation."""
         c = self.cfg
         return c.t_do if c.t_drift is None else c.t_drift
+
+    # kept as the internal name used by `step`
+    _drift = drift_step
 
     def _record(self, verb, arg, tick, objects, ok=None) -> None:
         self.log.append(
