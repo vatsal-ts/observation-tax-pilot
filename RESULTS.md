@@ -373,6 +373,50 @@ own words rather than its action counts.
 
 ---
 
+## R12. CORRECTION: par was computed with knowledge the agent lacks
+
+**Date** 2026-09-01 · **Script** `fair_par.py` · supersedes the R9 par values
+
+`blind_par.py` swept only the roaming zone (table, sink, basin). **The prompt
+never tells the agent the mover is confined there**; it lists all five places
+and says only that the cup moves. That par therefore knew the mover's range
+when the agent did not. It also took the *minimum* over sweep orders, which
+further assumes knowing which order is lucky.
+
+Corrected par sweeps all five places and takes the **mean over all 120 orders**,
+since a blind agent cannot select the lucky one.
+
+| charged | par (R9, wrong) | par (fair) | agent say 0 | headroom |
+|---|---|---|---|---|
+| 0 | 1.94 | **3.00** | 3.66 | **0.66** (was 1.72) |
+| 2 | 1.94 | **4.77** | 8.69 | **3.92** (was 6.75) |
+| 5 | 8.01 | **14.71** | 23.74 | **9.03** (was 15.73) |
+
+Fair par at charged 0 matches theory exactly: sweeping five places in an order
+you cannot optimise, the mover's place has expected rank (1+2+3+4+5)/5 = 3.0.
+Across the 120 orders the spread is min 1.92, mean 3.00, max 4.08. The 1.92 is
+what the old par reported, and it is unattainable without knowing the range.
+
+**Three consequences.**
+
+1. **The floor defence fails.** Only 0.66 observations were available above par
+   at charged 0, and the measured effect was 0.34. The charged-0 null is
+   therefore consistent with the agent already being near what a blind searcher
+   can achieve, and is not on its own evidence of insensitivity.
+2. **"Charging 2 does not raise the minimum observation count" is dead.** That
+   was an artifact of the three-place sweep, in which the mover never relocated
+   mid-search. Fair par rises 3.00 to 4.77 to 14.71, so charging makes the task
+   harder for an optimal blind player too. The knife-edge framing built on it
+   has been removed from the paper.
+3. **"The agent never approaches par" is too strong.** At charged 0 it runs
+   1.22x par, not 1.7x. Its *excess* still grows with the price (0.66, 3.92,
+   9.03), which is the claim that survives.
+
+The 33% of observations the agent spends in the fixed zone are **not waste**.
+It has no way to know the mover is never there.
+
+---
+
 ## R11. Effect sizes with intervals, and a run-selection bug
 
 **Date** 2026-09-01 · **Script** `effect_size.py` · bootstrap, 20k resamples

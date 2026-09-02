@@ -29,7 +29,8 @@ downstream means anything. `test_channel_audit.py` proves it four ways:
 | `world.py` | the simulator, the action API, the referee |
 | `test_channel_audit.py` | the leak test described above |
 | `oracle.py` | *informed* par: best staleness by search against the true world |
-| `blind_par.py` | *blind* par: best mean over 18 blind policies, the one to use |
+| `blind_par.py` | superseded: swept only the roaming zone, see fair_par |
+| `fair_par.py` | **par under the agent's own information**, the one to use |
 | `check_lie_detection.py` | does the agent notice when the quoted price is false? |
 | `analyze.py` | consolidates every completed grid into cross-run tables |
 | `effect_size.py` | bootstrap intervals and headroom-normalised effects |
@@ -88,14 +89,15 @@ a fixed zone, with the target outside the mover's range.
 **Blind par is not informed par.** `oracle.par_staleness` walks straight to the
 mover because it knows the schedule, so it is an *informed* par. The proposal
 specifies a *blind* par-setter, which must search and therefore does worse.
-Closed by `blind_par.py`: par is 1.94, 1.94 and 8.01 observations at charged 0,
-2 and 5, and the agent never gets within 1.7x of it. Being the best of a policy
-class rather than a proven optimum, it upper-bounds the true optimum, so the
-reported excesses are lower bounds.
+Closed by `fair_par.py`, but only on the second attempt. `blind_par.py` swept
+just the roaming zone, which the prompt never tells the agent about, so it knew
+the mover's range when the agent did not. Fair par sweeps all five places and
+averages over all 120 orders, since a blind agent cannot pick the lucky one.
+Par is **3.00, 4.77 and 14.71** at charged 0, 2 and 5, matching theory at
+charged 0 where the mover's place has expected rank (1+2+3+4+5)/5 = 3.
 
-**Charging 2 does not raise the minimum observation count, but it is not
-therefore harmless.** Par is 1.94 at both charged 0 and 2. What changes is
-slack: an optimal sweep finishes seven ticks before the mover relocates at
-charged 0, and **one** tick before it at charged 2. Cost 2 turns a forgiving
-task into a knife-edge one, which is why the agent's usage doubles while par
-does not move.
+**Charging makes the task harder for everyone.** Par itself rises fivefold from
+charged 0 to 5, because an optimal sweep starts losing the mover mid-search.
+The agent's *excess* above par grows too, 0.66 to 3.92 to 9.03, so it degrades
+faster than the task does. At charged 0 it runs only 1.22x par, so it is not
+far off a blind optimum when observation is free.
