@@ -10,32 +10,19 @@ from __future__ import annotations
 
 import glob
 import json
-import re
 import statistics
 from pathlib import Path
 
-RUN_RE = re.compile(r"grid-(?P<model>.+?)-(?P<style>plain|salient)-"
-                    r"(?P<sched>random|periodic)-(?P<family>\S+?-target)-"
-                    r"(?P<stamp>\d{8}-\d{6})-summary\.json")
+from runs_io import load_runs as _load
 
-
-def load_runs() -> list[dict]:
-    runs = []
-    for f in sorted(glob.glob("runs/grid-*-summary.json")):
-        m = RUN_RE.search(Path(f).name)
-        if not m:
-            continue
-        rows = json.load(open(f))
-        if len(rows) < 9:          # keep only complete 3x3 grids
-            continue
-        runs.append({**m.groupdict(), "rows": rows, "file": f})
-    # if a config was run twice, keep the newest
-    best: dict[tuple, dict] = {}
-    for r in runs:
-        key = (r["model"], r["style"], r["sched"], r["family"])
-        if key not in best or r["stamp"] > best[key]["stamp"]:
-            best[key] = r
-    return list(best.values())
+def load_runs_summaries() -> list[dict]:
+    """Complete grids only, newest per configuration, via the shared loader."""
+    out = []
+    for run in _load(verbose=True):
+        rows = json.load(open(run["file"].replace(".json", "-summary.json"),
+                              encoding="utf-8"))
+        out.append({**run, "rows": rows})
+    return out
 
 
 def grid(rows, field):
@@ -51,7 +38,7 @@ def stated_effects(rows, costs=(0, 2, 5)):
 
 
 def main() -> None:
-    runs = load_runs()
+    runs = load_runs_summaries()
     if not runs:
         print("No complete grids found.")
         return

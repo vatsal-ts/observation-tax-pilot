@@ -32,6 +32,8 @@ downstream means anything. `test_channel_audit.py` proves it four ways:
 | `blind_par.py` | *blind* par: best mean over 18 blind policies, the one to use |
 | `check_lie_detection.py` | does the agent notice when the quoted price is false? |
 | `analyze.py` | consolidates every completed grid into cross-run tables |
+| `effect_size.py` | bootstrap intervals and headroom-normalised effects |
+| `runs_io.py` | the one run loader: drops incomplete grids, newest per config |
 | `feasibility.py` | which (cost, relocation period) cells are winnable at all |
 | `run_pilot.py` | measurement demonstration using fixed policies, no API needed |
 | `agent.py` | ReAct loop over an OpenAI model |

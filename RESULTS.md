@@ -373,6 +373,50 @@ own words rather than its action counts.
 
 ---
 
+## R11. Effect sizes with intervals, and a run-selection bug
+
+**Date** 2026-09-01 · **Script** `effect_size.py` · bootstrap, 20k resamples
+
+**A contamination bug, found first.** `runs/` holds two files matching
+`plain-random-dynamic`: the 16-episode smoke test (`120308`) and the real
+449-episode grid (`122417`). Globbing on the configuration signature merged
+them, giving n=54 per cell and shifted means (3.50 rather than 3.66). All
+loaders now go through `runs_io.py`, which drops grids below 100 episodes and
+keeps the newest file per configuration. The same bug had inflated the
+lie-detection scan to 204 transcripts by pooling in the smoke test; the correct
+figure is **200**, pooled over four configurations, still with zero notices.
+
+**Effects, on per-episode counts rather than means:**
+
+| charged | par | say 0 | say 5 | cut | headroom | cut/headroom | 95% CI |
+|---|---|---|---|---|---|---|---|
+| 0 | 1.94 | 3.66 | 3.32 | 0.34 | 1.72 | 20% | [-1.04, +0.34] |
+| 2 | 1.94 | 8.69 | 6.96 | 1.73 | 6.75 | 26% | [-4.77, +1.28] |
+| 5 | 8.01 | 23.74 | 16.36 | 7.38 | 15.73 | 47% | [-14.96, -0.02] |
+
+**Only the charged-5 contrast excludes zero, and narrowly.** Charged 0
+(Welch t = -0.95) and charged 2 both include zero. At 50 episodes per cell the
+study is underpowered for everything but the largest contrast.
+
+**Consequences for what may be claimed.**
+
+1. "The stated price does almost nothing" must become "no detectable effect".
+   We failed to detect one; we did not measure a small one.
+2. **The monotonic-across-three-levels claim is dropped.** The intermediate
+   level is indistinguishable from either end. What survives is a difference
+   between an unenforced and a fully enforced price.
+3. The floor objection is answered: par is 1.94 against an agent mean of 3.66,
+   so 1.72 observations were available above par. Absence of headroom does not
+   explain the null.
+
+**Cost language, corrected.** The earlier 22% vs 57% figures pooled cells and
+were meaningless. Restricted to the say=5/do=0 cell, cost words appear in 25 of
+50 salient-arm episodes and **0 of 50** in every plain arm, which simply
+reflects that the salient prompt talks about cost. The claim was removed from
+the paper.
+
+---
+
 ## Open items
 
 1. **Unexplained staleness cell.** `say=2 do=5` gave excess 10.16 against 1.04
